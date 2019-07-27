@@ -1,4 +1,3 @@
-
 import re
 import requests
 import json
@@ -21,8 +20,8 @@ class VkHttp:
 			data = {'email': login, 'pass': password}
 		)
 
-	def add_group_to_chat(self, peer_id, group_id):
-		return self._invite_by_hash(peer_id, group_id, self._get_inviting_hash(group_id))
+	def add_group_to_chat(self, chat_id, group_id):
+		return self._invite_by_hash(chat_id, group_id, self._get_inviting_hash(group_id))
 
 	def _get_inviting_html(self, group_id):
 		return self.session.post(
@@ -37,7 +36,7 @@ class VkHttp:
 	def _get_inviting_hash(self, group_id):
 		return json.loads(re.sub(r'.*\n.*\n.*json>', '', self._get_inviting_html(group_id).text)).get('add_hash')
 
-	def _invite_by_hash(self, peer_id, group_id, hash):
+	def _invite_by_hash(self, chat_id, group_id, hash):
 		return self.session.post(
 			'https://vk.com/al_im.php',
 			data = {
@@ -45,6 +44,29 @@ class VkHttp:
 				'al': 1,
 				'add_hash': hash,
 				'bot_id': -group_id,
-				'peer_ids': peer_id
+				'peer_ids': chat_id
 			}
 		).text
+
+	def create_chat(self, user_ids, title):
+		return self._create_chat_by_hash(user_ids, title, self._get_write_hash())
+
+	def _get_create_chat_html(self):
+		return self.session.get('https://vk.com/im?act=create')
+
+	def _get_write_hash(self):
+		return re.search(r'(?:"writeHash":")(.*?)(?:")', self._get_create_chat_html().text).group(1)
+
+	def _create_chat_by_hash(self, user_ids, title, hash):
+		result = self.session.post(
+			'https://vk.com/al_im.php',
+			data = {
+				'act': 'a_multi_start',
+				'al': 1,
+				'im_v': 2,
+				'peers': ','.join(str(x) for x in user_ids),
+				'title': title,
+				'hash': hash
+			}
+		).text
+		return re.search(r'(?:"peerId":)(\d+)', result).group(1)
